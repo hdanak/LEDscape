@@ -15,6 +15,7 @@ var Commands = {
         pinTable_1.printPinTable("GPIO: BANK_BIT", function (pin) { return pin.gpioNum ? pin.gpioName : ""; });
         pinTable_1.printPinTable("GPIO: Global Number", function (pin) { return pin.gpioNum || ""; });
         pinTable_1.printPinTable("Mapped Channel Index", function (pin) { return pin.mappedChannelIndex != undefined ? pin.mappedChannelIndex : ""; });
+        pinTable_1.printPinTable("HDMI / eMMC Conflicts", function (pin) { return pin.mappedChannelIndex != undefined ? (pin.mappedChannelIndex + (pin.bbbHdmiPin ? "H" : "") + (pin.emmcPin ? "E" : "")) : ""; });
         pinTable_1.printPinTable("Unused Channels", function (pin) { return (pin.mappedChannelIndex == undefined && pin.gpioNum != undefined) ? pin.gpioName : ""; });
         console.info("PRU0 Pins: " + bbbPinData_1.pinIndex.pinData.filter(function (d) { return d.r30pru == 0; }).length);
         console.info("PRU1 Pins: " + bbbPinData_1.pinIndex.pinData.filter(function (d) { return d.r30pru == 1; }).length);
@@ -80,18 +81,18 @@ var Commands = {
                 "/sys/devices/bone_capemgr.9"
             ];
             var setupScriptPath = tempDir + "/" + modeName + "-" + mappingFilename.match(/.*?([^\/\.]+)(\..+)?/)[1] + "-" + channelCount + "ch-setup.sh";
-            var setupScript = "\nfunction enableOverlay() {\n\tOVERLAY_NAME=$1\n\t\n\tfor CAPEMGR in " + capemgrDirectories.join(" ") + "; do\n\t\tif [ -d \"$CAPEMGR\" ]; then\n\t\t\tif grep \"$OVERLAY_NAME\" \"$CAPEMGR/slots\" &>/dev/null; then\n\t\t\t\t\techo PRU overlay $OVERLAY_NAME already present in $CAPEMGR/slots\n\t\t\t\telse\n\t\t\t\t\tif echo \"$OVERLAY_NAME\" > \"$CAPEMGR/slots\"; then\n\t\t\t\t\t\techo Enabled PRU using overlay $OVERLAY_NAME into $CAPEMGR/slots\n\t\t\t\t\telse\n\t\t\t\t\t\techo ERROR: Failed to load overlay $OVERLAY_NAME into $CAPEMGR/slots\n\t\t\t\t\t\texit -1\n\t\t\t\t\tfi\n\t\t\t\tfi\n\t\t\treturn\n\t\tfi\n\tdone\n\t\n\techo ERROR: Failed to find a bone_capemgr\n\texit -1\n}\n\necho Enabling PRUs using overlay...\nenableOverlay uio_pruss_enable\n\nif modprobe uio_pruss; then\n\techo Loaded module uio_pruss\nelse\n\techo ERROR: Failed to load module uio_pruss\n\texit -1\nfi\n";
+            var setupScript = "\nexit 0\n\nfunction enableOverlay() {\n\tOVERLAY_NAME=$1\n\t\n\tfor CAPEMGR in " + capemgrDirectories.join(" ") + "; do\n\t\tif [ -d \"$CAPEMGR\" ]; then\n\t\t\tif grep \"$OVERLAY_NAME\" \"$CAPEMGR/slots\" &>/dev/null; then\n\t\t\t\t\techo PRU overlay $OVERLAY_NAME already present in $CAPEMGR/slots\n\t\t\t\telse\n\t\t\t\t\tif echo \"$OVERLAY_NAME\" > \"$CAPEMGR/slots\"; then\n\t\t\t\t\t\techo Enabled PRU using overlay $OVERLAY_NAME into $CAPEMGR/slots\n\t\t\t\t\telse\n\t\t\t\t\t\techo ERROR: Failed to load overlay $OVERLAY_NAME into $CAPEMGR/slots\n\t\t\t\t\t\texit -1\n\t\t\t\t\tfi\n\t\t\t\tfi\n\t\t\treturn\n\t\tfi\n\tdone\n\t\n\techo ERROR: Failed to find a bone_capemgr\n\texit -1\n}\n\necho Enabling PRUs using overlay...\nenableOverlay uio_pruss_enable\n\nif modprobe uio_pruss; then\n\techo Loaded module uio_pruss\nelse\n\techo ERROR: Failed to load module uio_pruss\n\texit -1\nfi\n";
             if (pinMapping.dtbName) {
                 var dtboSourceFilename = __dirname + "/../dts/" + pinMapping.dtbName + "-00A0.dtbo";
                 var dtboDestFilename = "/lib/firmware/" + pinMapping.dtbName + "-00A0.dtbo";
                 setupScript += "\nfor CAPEMGR in " + capemgrDirectories.join(" ") + "; do\n\tif [ -d \"$CAPEMGR\" ]; then\n\t\tif [ -e \"" + dtboSourceFilename + "\" ]; then\n\t\t\tif [ -e \"" + dtboDestFilename + "\" ]; then\n\t\t\t\techo Overlay dtbo already exists: " + dtboDestFilename + "\n\t\t\telif cp \"" + dtboSourceFilename + "\" \"" + dtboDestFilename + "\"; then\n\t\t\t\techo Copied overlay dtbo " + dtboSourceFilename + " to " + dtboDestFilename + "\n\t\t\telse\n\t\t\t\techo ERROR: Failed to copy overlay dtbo from " + dtboSourceFilename + " to " + dtboDestFilename + "\n\t\t\t\texit -1\n\t\t\tfi\n\t\t\t\n\t\t\techo Mapping LEDscape pins using overlay...\n\t\t\tenableOverlay " + pinMapping.dtbName + "\n\t\tfi\n\t\texit 0\n\tfi\ndone\n\necho ERROR: Failed to find a bone_capemgr in /sys/\nexit -1\n\t\t\t\t\t";
             }
             else {
-                setupScript += "if [ -d /sys/class/gpio ]; then";
+                setupScript += "if [ -d /sys/class/gpio ]; then\n";
                 usedPins.forEach(function (pin) {
-                    setupScript += "    echo Setting up channel " + pin.mappedChannelIndex + " (pin " + pin.headerName + ")\n";
+                    setupScript += "    echo 'Setting up channel " + pin.mappedChannelIndex + " (pin " + pin.headerName + ")'\n";
                     setupScript += "    echo " + pin.gpioNum + " >> /sys/class/gpio/export\n";
-                    setupScript += "    echo out >> /sys/class/gpio/gpio/" + pin.gpioNum + "/direction\n";
+                    setupScript += "    echo out >> /sys/class/gpio/gpio" + pin.gpioNum + "/direction\n";
                     setupScript += "    echo 0 >> /sys/class/gpio/gpio" + pin.gpioNum + "/value\n";
                 });
                 setupScript += "\n\t\t\t\telse\n\t\t\t\t\techo ERROR: No /sys/class/gpio found.\n\t\t\t\t\texit -1\n\t\t\t\tfi\n\t\t\t\t";

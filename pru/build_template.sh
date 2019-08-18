@@ -20,7 +20,6 @@ for MAPPING_NAME in $(cd "$MAPPING_DIR"; ls *.json|sed s/.json$//); do
 
 	PRU0_FILENAME=$OUTPUT_DIR/$PROGRAM_NAME-$MAPPING_NAME-pru0.p
 	echo "#define PRU_NUM 0" > $PRU0_FILENAME
-	echo "#define PRU_NUM 0" > $PRU0_FILENAME
 	echo "#include \"mapping-$MAPPING_NAME-p.h\"" >> $PRU0_FILENAME
 	echo "#include \"../$TEMPLATE_DIR/$PROGRAM_NAME.p\"" >> $PRU0_FILENAME
 

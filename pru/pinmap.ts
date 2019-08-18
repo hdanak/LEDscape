@@ -112,6 +112,8 @@ const Commands = {
 			const setupScriptPath = tempDir + "/" + modeName + "-" + mappingFilename.match(/.*?([^\/\.]+)(\..+)?/)[1] + "-" + channelCount + "ch-setup.sh";
 
 			let setupScript = `
+exit 0
+
 function enableOverlay() {
 	OVERLAY_NAME=$1
 	
